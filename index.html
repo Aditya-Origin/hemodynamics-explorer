@@ -259,6 +259,7 @@ function toggleProfile(key) {
     cp.style.opacity = '0.4'; cp.style.pointerEvents = 'none';
   }
   buildProfileButtons();
+  markDirty();
 }
 
 // ================================================
@@ -619,35 +620,39 @@ function syncCustomSliders(){
   $('v-mu').textContent=c.mu.toFixed(1)+' mPa\u00B7s'; $('v-resist').textContent=c.resistance.toFixed(2)+'x';
 }
 
-$('s-hr').oninput=e=>{PROFILES.custom.hr=+e.target.value;syncCustomSliders()};
-$('s-sys').oninput=e=>{PROFILES.custom.sys=+e.target.value;syncCustomSliders()};
-$('s-dia').oninput=e=>{PROFILES.custom.dia=+e.target.value;syncCustomSliders()};
-$('s-sv').oninput=e=>{PROFILES.custom.sv=+e.target.value;syncCustomSliders()};
-$('s-radius').oninput=e=>{PROFILES.custom.radius=+e.target.value;syncCustomSliders()};
-$('s-thick').oninput=e=>{PROFILES.custom.thick=+e.target.value;syncCustomSliders()};
-$('s-E').oninput=e=>{PROFILES.custom.E=+e.target.value;syncCustomSliders()};
-$('s-len').oninput=e=>{PROFILES.custom.len=+e.target.value;syncCustomSliders()};
-$('s-rho').oninput=e=>{PROFILES.custom.rho=+e.target.value;syncCustomSliders()};
-$('s-mu').oninput=e=>{PROFILES.custom.mu=+e.target.value;syncCustomSliders()};
-$('s-resist').oninput=e=>{PROFILES.custom.resistance=+e.target.value;syncCustomSliders()};
+let dirty=true; // flag: recompute waveforms
+function markDirty(){dirty=true}
+
+$('s-hr').oninput=e=>{PROFILES.custom.hr=+e.target.value;syncCustomSliders();markDirty()};
+$('s-sys').oninput=e=>{PROFILES.custom.sys=+e.target.value;syncCustomSliders();markDirty()};
+$('s-dia').oninput=e=>{PROFILES.custom.dia=+e.target.value;syncCustomSliders();markDirty()};
+$('s-sv').oninput=e=>{PROFILES.custom.sv=+e.target.value;syncCustomSliders();markDirty()};
+$('s-radius').oninput=e=>{PROFILES.custom.radius=+e.target.value;syncCustomSliders();markDirty()};
+$('s-thick').oninput=e=>{PROFILES.custom.thick=+e.target.value;syncCustomSliders();markDirty()};
+$('s-E').oninput=e=>{PROFILES.custom.E=+e.target.value;syncCustomSliders();markDirty()};
+$('s-len').oninput=e=>{PROFILES.custom.len=+e.target.value;syncCustomSliders();markDirty()};
+$('s-rho').oninput=e=>{PROFILES.custom.rho=+e.target.value;syncCustomSliders();markDirty()};
+$('s-mu').oninput=e=>{PROFILES.custom.mu=+e.target.value;syncCustomSliders();markDirty()};
+$('s-resist').oninput=e=>{PROFILES.custom.resistance=+e.target.value;syncCustomSliders();markDirty()};
 
 $('btn-play').onclick=()=>{anim.playing=!anim.playing;$('btn-play').innerHTML=anim.playing?'&#9646;&#9646;':'&#9654;'};
 document.querySelectorAll('.speed-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');anim.speed=+b.dataset.speed});
-window.addEventListener('resize',()=>{});
+window.addEventListener('resize',()=>{needsRedraw=true});
 
 // ================================================
-// MAIN UPDATE
+// CACHED RESULTS + COMPUTATION
 // ================================================
-function update(){
-  // Clamp custom
+let cachedResults=[];
+let needsRedraw=true;
+
+function recompute(){
   if(PROFILES.custom.dia>=PROFILES.custom.sys-5)PROFILES.custom.dia=PROFILES.custom.sys-5;
 
-  // Generate waveforms for all active profiles
-  const results=[];
+  cachedResults=[];
   for(const key of activeProfiles){
     const p=PROFILES[key];
     const wf=generateWomersley(p);
-    results.push({
+    cachedResults.push({
       key, label:p.label, color:COLORS[key],
       wf,
       metrics:{
@@ -660,18 +665,26 @@ function update(){
     });
   }
 
-  // Comparison table
-  buildComparisonTable(results);
-
-  // Legends
-  const legendItems=results.map(r=>({color:r.color,label:r.label}));
+  // These only need updating when data changes
+  buildComparisonTable(cachedResults);
+  const legendItems=cachedResults.map(r=>({color:r.color,label:r.label}));
   buildLegend('legend-pressure',legendItems);
   buildLegend('legend-velocity',legendItems);
   buildLegend('legend-radial',legendItems);
   buildLegend('legend-flow',legendItems);
   buildLegend('legend-wss',legendItems);
+  drawMultiRadial($('c-radial'),cachedResults.map(r=>({radial:r.radial,color:r.color,label:r.label,alpha:r.alpha})));
+  updateExplanation(cachedResults);
 
-  // Charts
+  dirty=false;
+  needsRedraw=true;
+}
+
+// Fast redraw — only redraws charts with cursor, no recomputation
+function redraw(){
+  const results=cachedResults;
+  if(!results.length)return;
+
   const pressureSeries=results.map(r=>({times:r.wf.times,data:r.wf.pressure,color:r.color,label:r.label}));
   const velocitySeries=results.map(r=>({times:r.wf.times,data:r.wf.velocity,color:r.color,label:r.label}));
   const flowSeries=results.map(r=>({times:r.wf.times,data:r.wf.flow,color:r.color,label:r.label}));
@@ -682,15 +695,10 @@ function update(){
   drawMultiTimeSeries($('c-flow'),flowSeries,'mL/s',0,null,{ySnap:50});
   drawMultiTimeSeries($('c-wss'),wssSeries,'dyn/cm\u00B2',0,null,{ySnap:5,yDec:1});
 
-  drawMultiRadial($('c-radial'),results.map(r=>({radial:r.radial,color:r.color,label:r.label,alpha:r.alpha})));
+  const tMax=results[0].wf.times[results[0].wf.times.length-1];
+  $('time-display').textContent='t = '+(anim.time%tMax).toFixed(0)+' ms';
 
-  // Cursor time
-  if(results.length){
-    const tMax=results[0].wf.times[results[0].wf.times.length-1];
-    $('time-display').textContent='t = '+(anim.time%tMax).toFixed(0)+' ms';
-  }
-
-  updateExplanation(results);
+  needsRedraw=false;
 }
 
 function updateExplanation(results){
@@ -736,12 +744,14 @@ c = &radic;(Eh/2&rho;R)  [Moens-Korteweg]
 // ================================================
 buildProfileButtons();
 syncCustomSliders();
+markDirty();
 
 let lastFrame=performance.now();
 function animate(now){
   const dt=now-lastFrame;lastFrame=now;
-  if(anim.playing)anim.time+=dt*anim.speed;
-  update();
+  if(anim.playing){anim.time+=dt*anim.speed;needsRedraw=true;}
+  if(dirty)recompute();
+  if(needsRedraw)redraw();
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
