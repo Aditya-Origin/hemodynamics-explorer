@@ -449,10 +449,8 @@ function drawMultiTimeSeries(canvas, seriesList, unit, yMinForce, yMaxForce, opt
     // Fill only if single series
     if(seriesList.length===1){
       const gr=ctx.createLinearGradient(0,pad.top,0,pad.top+ch);
-      gr.addColorStop(0,s.color.replace(')',',0.1)').replace('rgb','rgba').replace('#',''));
-      // Handle hex colors
-      const fc=hexToRGBA(s.color,0.1);const fc2=hexToRGBA(s.color,0);
-      gr.addColorStop(0,fc);gr.addColorStop(1,fc2);
+      gr.addColorStop(0,hexToRGBA(s.color,0.1));
+      gr.addColorStop(1,hexToRGBA(s.color,0));
       ctx.fillStyle=gr;ctx.lineTo(pad.left+cw,pad.top+ch);ctx.lineTo(pad.left,pad.top+ch);ctx.closePath();ctx.fill();
     }
     ctx.globalAlpha=1;
