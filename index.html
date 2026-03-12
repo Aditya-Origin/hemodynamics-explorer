@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hemodynamics PDE Explorer</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3348;
+    --text: #e2e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #6c8aff;
+    --red: #ef5350;
+    --blue: #42a5f5;
+    --green: #66bb6a;
+    --orange: #ffa726;
+    --purple: #ab47bc;
+    --cyan: #26c6da;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+
+  header{text-align:center;padding:1.8rem 1rem 0.7rem;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#161922,var(--bg))}
+  header h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.02em;margin-bottom:0.15rem}
+  header h1 span{color:var(--red)}
+  header p{color:var(--text-dim);font-size:0.88rem;max-width:700px;margin:0 auto}
+  header .eq-banner{margin-top:0.4rem;padding:0.35rem 0.7rem;display:inline-block;background:var(--surface);border:1px solid var(--border);border-radius:7px;font-size:0.75rem;color:var(--text-dim);font-family:'Courier New',monospace}
+
+  .app{display:grid;grid-template-columns:360px 1fr;max-width:1500px;margin:0 auto;min-height:calc(100vh - 130px)}
+  @media(max-width:1000px){.app{grid-template-columns:1fr}.sidebar{border-right:none!important;border-bottom:1px solid var(--border);max-height:none!important;position:static!important}}
+
+  .sidebar{border-right:1px solid var(--border);padding:1.1rem;overflow-y:auto;max-height:calc(100vh - 130px);position:sticky;top:0}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:0.85rem 0.95rem;margin-bottom:0.85rem}
+  .panel h3{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:0.55rem;display:flex;align-items:center;gap:0.35rem}
+  .panel h3 .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+  .slider-row{margin-bottom:0.7rem}
+  .slider-row:last-child{margin-bottom:0}
+  .slider-label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.15rem}
+  .slider-label span:first-child{font-size:0.8rem}
+  .slider-value{font-size:0.75rem;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:3px;background:var(--surface2);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+
+  /* Profile toggle buttons */
+  .profile-grid{display:flex;flex-wrap:wrap;gap:0.35rem;margin-top:0.4rem}
+  .profile-btn{
+    font-size:0.72rem;padding:0.3rem 0.6rem;border-radius:5px;
+    border:2px solid var(--border);background:var(--surface2);
+    color:var(--text-dim);cursor:pointer;transition:all 0.15s;
+    display:flex;align-items:center;gap:0.3rem;
+  }
+  .profile-btn .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;opacity:0.3;transition:opacity 0.15s}
+  .profile-btn.on{color:var(--text);background:rgba(255,255,255,0.05)}
+  .profile-btn.on .swatch{opacity:1}
+  .profile-hint{font-size:0.72rem;color:var(--text-dim);margin-top:0.4rem;line-height:1.4}
+
+  .playback{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem}
+  .play-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.85rem}
+  .play-btn:hover{border-color:var(--accent)}
+  .speed-btns{display:flex;gap:0.2rem}
+  .speed-btn{font-size:0.65rem;padding:0.15rem 0.35rem;border-radius:3px;border:1px solid var(--border);background:var(--surface2);color:var(--text-dim);cursor:pointer}
+  .speed-btn.active{color:var(--accent);border-color:var(--accent)}
+  .time-display{font-size:0.75rem;color:var(--text-dim);font-variant-numeric:tabular-nums}
+
+  .main{padding:1.1rem 1.4rem;overflow-y:auto}
+
+  /* Comparison table */
+  .cmp-table-wrap{overflow-x:auto;margin-bottom:1.1rem}
+  .cmp-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+  .cmp-table th{text-align:left;padding:0.4rem 0.6rem;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);border-bottom:1px solid var(--border);white-space:nowrap}
+  .cmp-table td{padding:0.4rem 0.6rem;border-bottom:1px solid rgba(46,51,72,0.5);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cmp-table tr:last-child td{border-bottom:none}
+  .cmp-table .profile-name{display:flex;align-items:center;gap:0.4rem;font-weight:600}
+  .cmp-table .profile-name .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+  .cmp-table .val{font-weight:600}
+  .cmp-table .unit{color:var(--text-dim);font-weight:400;font-size:0.7rem;margin-left:0.15rem}
+  .cmp-table-panel{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:1rem;margin-bottom:1.1rem}
+  .cmp-table-panel h2{font-size:0.88rem;font-weight:600;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem}
+
+  .chart-section{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:1.05rem;margin-bottom:1.05rem}
+  .chart-section h2{font-size:0.88rem;font-weight:600;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem}
+  .chart-section h2 .icon{font-size:0.95rem}
+  .chart-desc{font-size:0.75rem;color:var(--text-dim);margin-bottom:0.4rem;line-height:1.5}
+  .chart-desc code{background:var(--surface2);padding:0.1rem 0.25rem;border-radius:3px;font-size:0.72rem;color:var(--cyan)}
+  canvas{width:100%;height:220px;display:block;border-radius:6px}
+  canvas.tall{height:280px}
+
+  .chart-legend{display:flex;gap:0.8rem;margin-bottom:0.35rem;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:0.25rem;font-size:0.7rem;color:var(--text-dim)}
+  .legend-swatch{width:14px;height:3px;border-radius:2px;display:inline-block}
+
+  .explanation{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:1.05rem;margin-bottom:1.05rem}
+  .explanation h2{font-size:0.88rem;font-weight:600;margin-bottom:0.4rem}
+  .explanation p{font-size:0.8rem;color:var(--text-dim);line-height:1.7;margin-bottom:0.4rem}
+  .explanation p:last-child{margin-bottom:0}
+  .explanation strong{color:var(--text)}
+  .eq-block{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:0.5rem 0.7rem;margin:0.4rem 0;font-family:'Courier New',monospace;font-size:0.75rem;color:var(--cyan);line-height:1.8;overflow-x:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Pulsatile <span>Blood Velocity</span> — PDE Explorer</h1>
+  <p>Womersley flow, Moens-Korteweg wave speed, TPR compensation. Toggle multiple profiles to compare side-by-side.</p>
+  <div class="eq-banner">&rho; &part;u/&part;t = -&part;P/&part;x + &mu; &nabla;&sup2;u &nbsp;|&nbsp; c = &radic;(Eh/2&rho;R) &nbsp;|&nbsp; Q = C dP/dt + P/R</div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+
+    <!-- Profiles -->
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--accent)"></span> Profiles (toggle to compare)</h3>
+      <div class="profile-grid" id="profile-grid"></div>
+      <div class="profile-hint">Click multiple profiles to overlay them on every chart. Use "Custom" to adjust sliders manually.</div>
+    </div>
+
+    <!-- Custom sliders -->
+    <div class="panel" id="panel-custom" style="opacity:0.4;pointer-events:none">
+      <h3><span class="dot" style="background:var(--text-dim)"></span> Custom Profile Sliders</h3>
+      <div class="slider-row"><div class="slider-label"><span>Heart Rate</span><span class="slider-value" id="v-hr">72 bpm</span></div><input type="range" id="s-hr" min="40" max="180" value="72"></div>
+      <div class="slider-row"><div class="slider-label"><span>Systolic BP</span><span class="slider-value" id="v-sys">120 mmHg</span></div><input type="range" id="s-sys" min="80" max="200" value="120"></div>
+      <div class="slider-row"><div class="slider-label"><span>Diastolic BP</span><span class="slider-value" id="v-dia">80 mmHg</span></div><input type="range" id="s-dia" min="40" max="130" value="80"></div>
+      <div class="slider-row"><div class="slider-label"><span>Stroke Volume</span><span class="slider-value" id="v-sv">70 mL</span></div><input type="range" id="s-sv" min="30" max="130" value="70"></div>
+      <div class="slider-row"><div class="slider-label"><span>Radius (R&#x2080;)</span><span class="slider-value" id="v-radius">12.5 mm</span></div><input type="range" id="s-radius" min="5" max="20" value="12.5" step="0.5"></div>
+      <div class="slider-row"><div class="slider-label"><span>Wall Thickness (h)</span><span class="slider-value" id="v-thick">1.5 mm</span></div><input type="range" id="s-thick" min="0.5" max="4" value="1.5" step="0.1"></div>
+      <div class="slider-row"><div class="slider-label"><span>Young's Modulus (E)</span><span class="slider-value" id="v-E">0.40 MPa</span></div><input type="range" id="s-E" min="0.1" max="3" value="0.4" step="0.05"></div>
+      <div class="slider-row"><div class="slider-label"><span>Vessel Length</span><span class="slider-value" id="v-len">40 cm</span></div><input type="range" id="s-len" min="10" max="80" value="40"></div>
+      <div class="slider-row"><div class="slider-label"><span>Density (&rho;)</span><span class="slider-value" id="v-rho">1060 kg/m&sup3;</span></div><input type="range" id="s-rho" min="900" max="1200" value="1060" step="10"></div>
+      <div class="slider-row"><div class="slider-label"><span>Viscosity (&mu;)</span><span class="slider-value" id="v-mu">3.5 mPa&middot;s</span></div><input type="range" id="s-mu" min="1" max="8" value="3.5" step="0.1"></div>
+      <div class="slider-row"><div class="slider-label"><span>TPR Multiplier</span><span class="slider-value" id="v-resist">1.00x</span></div><input type="range" id="s-resist" min="0.3" max="4" value="1" step="0.05"></div>
+    </div>
+
+    <!-- Animation -->
+    <div class="panel">
+      <h3><span class="dot" style="background:var(--cyan)"></span> Animation</h3>
+      <div class="playback">
+        <button class="play-btn" id="btn-play">&#9654;</button>
+        <div class="speed-btns">
+          <button class="speed-btn" data-speed="0.25">0.25x</button>
+          <button class="speed-btn" data-speed="0.5">0.5x</button>
+          <button class="speed-btn active" data-speed="1">1x</button>
+          <button class="speed-btn" data-speed="2">2x</button>
+        </div>
+        <div class="time-display" id="time-display">t = 0 ms</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Comparison Table -->
+    <div class="cmp-table-panel" id="cmp-panel">
+      <h2>&#9636; Profile Comparison</h2>
+      <div class="cmp-table-wrap"><table class="cmp-table" id="cmp-table"></table></div>
+    </div>
+
+    <div class="chart-section">
+      <h2><span class="icon" style="color:var(--red)">&#9829;</span> Aortic Pressure</h2>
+      <div class="chart-legend" id="legend-pressure"></div>
+      <canvas id="c-pressure"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <h2><span class="icon" style="color:var(--blue)">&#8594;</span> Blood Velocity (Womersley)</h2>
+      <div class="chart-desc"><code>&rho; &part;u/&part;t = -dP/dx + &mu;/r &part;/&part;r(r &part;u/&part;r)</code> — Fourier-decomposed, each harmonic solved with Bessel J&#x2080;/J&#x2081;.</div>
+      <div class="chart-legend" id="legend-velocity"></div>
+      <canvas id="c-velocity"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <h2><span class="icon" style="color:var(--cyan)">&#9673;</span> Radial Velocity Profile (Peak Systole)</h2>
+      <div class="chart-desc">Cross-section <code>u(r)</code> at peak systole. Low &alpha; &rarr; parabolic. High &alpha; &rarr; flat plug flow.</div>
+      <div class="chart-legend" id="legend-radial"></div>
+      <canvas id="c-radial" class="tall"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <h2><span class="icon" style="color:var(--green)">&#9676;</span> Volumetric Flow</h2>
+      <div class="chart-legend" id="legend-flow"></div>
+      <canvas id="c-flow"></canvas>
+    </div>
+
+    <div class="chart-section">
+      <h2><span class="icon" style="color:var(--purple)">&#8766;</span> Wall Shear Stress</h2>
+      <div class="chart-desc"><code>&tau;_w = -&mu; &part;u/&part;r |<sub>r=R</sub></code></div>
+      <div class="chart-legend" id="legend-wss"></div>
+      <canvas id="c-wss"></canvas>
+    </div>
+
+    <div class="explanation" id="explanation"></div>
+  </main>
+</div>
+
+<script>
+// ================================================
+// PROFILES
+// ================================================
+const PROFILES = {
+  normal:      {label:'Healthy Adult', hr:72, sys:120,dia:80, sv:70, radius:12.5,thick:1.5,E:0.4, len:40,rho:1060,mu:3.5,resistance:1.0},
+  elderly:     {label:'Elderly (Stiff)',hr:78, sys:155,dia:90, sv:60, radius:11,  thick:2.2,E:1.8, len:40,rho:1060,mu:3.8,resistance:1.5},
+  athlete:     {label:'Athlete',       hr:50, sys:115,dia:65, sv:110,radius:14,  thick:1.6,E:0.3, len:42,rho:1060,mu:3.4,resistance:0.7},
+  hypertension:{label:'Hypertension',  hr:80, sys:165,dia:100,sv:65, radius:11.5,thick:2.0,E:1.2, len:40,rho:1060,mu:3.6,resistance:1.8},
+  marfan:      {label:'Marfan',        hr:75, sys:110,dia:65, sv:75, radius:18,  thick:0.8,E:0.15,len:45,rho:1060,mu:3.5,resistance:0.8},
+  child:       {label:'Child',         hr:100,sys:100,dia:65, sv:40, radius:8,   thick:1.0,E:0.3, len:25,rho:1060,mu:3.3,resistance:0.6},
+  polycythemia:{label:'Polycythemia',  hr:72, sys:130,dia:85, sv:65, radius:12.5,thick:1.5,E:0.5, len:40,rho:1080,mu:6.0,resistance:1.3},
+  custom:      {label:'Custom',        hr:72, sys:120,dia:80, sv:70, radius:12.5,thick:1.5,E:0.4, len:40,rho:1060,mu:3.5,resistance:1.0},
+};
+
+const COLORS = {
+  normal:      '#42a5f5',
+  elderly:     '#ef5350',
+  athlete:     '#66bb6a',
+  hypertension:'#ffa726',
+  marfan:      '#ab47bc',
+  child:       '#26c6da',
+  polycythemia:'#ffee58',
+  custom:      '#8b8fa3',
+};
+
+let activeProfiles = new Set(['normal']); // start with healthy adult
+let anim = { playing:true, speed:1, time:0 };
+
+const $=id=>document.getElementById(id);
+
+// ================================================
+// BUILD PROFILE BUTTONS
+// ================================================
+function buildProfileButtons() {
+  const grid = $('profile-grid');
+  grid.innerHTML = '';
+  for (const [key, prof] of Object.entries(PROFILES)) {
+    const btn = document.createElement('button');
+    btn.className = 'profile-btn' + (activeProfiles.has(key) ? ' on' : '');
+    btn.dataset.key = key;
+    btn.style.borderColor = activeProfiles.has(key) ? COLORS[key] : '';
+    btn.innerHTML = `<span class="swatch" style="background:${COLORS[key]}"></span>${prof.label}`;
+    btn.onclick = () => toggleProfile(key);
+    grid.appendChild(btn);
+  }
+}
+
+function toggleProfile(key) {
+  if (activeProfiles.has(key)) {
+    if (activeProfiles.size <= 1) return; // keep at least one
+    activeProfiles.delete(key);
+  } else {
+    activeProfiles.add(key);
+  }
+  // Enable/disable custom sliders
+  const cp = $('panel-custom');
+  if (activeProfiles.has('custom')) {
+    cp.style.opacity = '1'; cp.style.pointerEvents = 'auto';
+  } else {
+    cp.style.opacity = '0.4'; cp.style.pointerEvents = 'none';
+  }
+  buildProfileButtons();
+}
+
+// ================================================
+// COMPLEX MATH
+// ================================================
+function cadd(a,b){return[a[0]+b[0],a[1]+b[1]]}
+function csub(a,b){return[a[0]-b[0],a[1]-b[1]]}
+function cmul(a,b){return[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]]}
+function cdiv(a,b){const d=b[0]*b[0]+b[1]*b[1];return[(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]}
+function cabs(a){return Math.sqrt(a[0]*a[0]+a[1]*a[1])}
+function cscale(a,s){return[a[0]*s,a[1]*s]}
+function creal(a){return a[0]}
+
+function besselJ0(z){let s=[1,0],t=[1,0];const z2=cmul(z,z);for(let k=1;k<=30;k++){t=cmul(t,cscale(z2,-1/(4*k*k)));s=cadd(s,t);if(cabs(t)<1e-15)break}return s}
+function besselJ1(z){let s=[.5,0],t=[.5,0];const z2=cmul(z,z);for(let k=1;k<=30;k++){t=cmul(t,cscale(z2,-1/(4*k*(k+1))));s=cadd(s,t);if(cabs(t)<1e-15)break}return cmul(z,s)}
+
+// ================================================
+// PRESSURE WAVEFORM
+// ================================================
+function pressureRaw(phase){
+  return Math.exp(-((phase-.12)**2)/.02)*.7+Math.exp(-((phase-.18)**2)/.016)*.5
+    -Math.exp(-((phase-.38)**2)/.004)*.15+Math.exp(-((phase-.44)**2)/.008)*.12
+    +Math.exp(-3.5*Math.max(phase-.4,0))*.3;
+}
+
+function fourierDecompose(data,N,nH){
+  const h=[];
+  for(let n=0;n<=nH;n++){let a=0,b=0;for(let i=0;i<N;i++){const th=2*Math.PI*n*i/N;a+=data[i]*Math.cos(th);b+=data[i]*Math.sin(th)}a*=2/N;b*=2/N;if(n===0)a/=2;h.push({a,b})}
+  return h;
+}
+
+// ================================================
+// WOMERSLEY SOLVER
+// ================================================
+function generateWomersley(p) {
+  const T=60/p.hr, omega=2*Math.PI/T, Ncyc=256, nHarm=12;
+  const R0=p.radius*1e-3, h=p.thick*1e-3, E=p.E*1e6, L=p.len*1e-2, mu=p.mu*1e-3;
+  const {rho}=p;
+
+  const c_mk=Math.sqrt(E*h/(2*rho*R0));
+  const alpha=R0*Math.sqrt(omega*rho/mu);
+  const A0=Math.PI*R0*R0;
+  const C_wk=3*A0*L/(2*rho*c_mk*c_mk);
+  const MAP_Pa=(p.dia+(p.sys-p.dia)/3)*133.322;
+  const CO=p.sv*1e-6*p.hr/60;
+  const R_periph=(MAP_Pa/CO)*p.resistance;
+
+  // Pressure cycle
+  const raw=[];let mn=Infinity,mx=-Infinity;
+  for(let i=0;i<Ncyc;i++){const v=pressureRaw(i/Ncyc);raw.push(v);if(v<mn)mn=v;if(v>mx)mx=v}
+  const pCyc=raw.map(v=>(p.dia+(p.sys-p.dia)*(v-mn)/(mx-mn))*133.322);
+
+  // Windkessel flow
+  const dt=T/Ncyc;
+  const qCyc=[];
+  for(let i=0;i<Ncyc;i++){
+    const ip=(i+1)%Ncyc,im=(i-1+Ncyc)%Ncyc;
+    let Q=C_wk*(pCyc[ip]-pCyc[im])/(2*dt)+pCyc[i]/R_periph;
+    qCyc.push(Math.max(Q,0));
+  }
+  const uCyc=qCyc.map(Q=>Q/A0);
+  const uH=fourierDecompose(uCyc,Ncyc,nHarm);
+
+  // Build 3-cycle output
+  const N=800, totalTime=3*T;
+  const times=[],pressure=[],velocity=[],flow=[],wss=[];
+
+  for(let i=0;i<N;i++){
+    const t=(i/N)*totalTime, phase=(t%T)/T;
+    const idx=Math.floor(phase*Ncyc)%Ncyc;
+    times.push(t*1000);
+    pressure.push(pCyc[idx]/133.322);
+
+    let u=uH[0].a;
+    for(let n=1;n<=nHarm;n++){const th=2*Math.PI*n*phase;u+=uH[n].a*Math.cos(th)+uH[n].b*Math.sin(th)}
+    u=Math.max(u,0);
+    velocity.push(u*100);
+    flow.push(u*A0*1e6);
+
+    let tau=4*mu*uH[0].a/R0;
+    for(let n=1;n<=nHarm;n++){
+      const on=n*omega, an=R0*Math.sqrt(on*rho/mu);
+      const i32=[-1/Math.SQRT2,1/Math.SQRT2];
+      const Lam=cscale(i32,an);
+      const corr=cmul(cscale(Lam,.5),cdiv(besselJ1(Lam),besselJ0(Lam)));
+      const th=2*Math.PI*n*phase;
+      const ut=creal(cmul([uH[n].a,-uH[n].b],[Math.cos(th),Math.sin(th)]));
+      tau+=(4*mu/R0)*creal(corr)*ut;
+    }
+    wss.push(Math.abs(tau)*10);
+  }
+
+  // Radial profile at peak systole
+  const peakIdx=velocity.indexOf(Math.max(...velocity));
+  const peakPhase=(times[peakIdx]/1000%T)/T;
+  const radial=[];const nR=50;
+  for(let j=0;j<=nR;j++){
+    const rf=j/nR, r=rf*R0;
+    let ur=uH[0].a*2*(1-rf*rf);
+    for(let n=1;n<=nHarm;n++){
+      const on=n*omega,an=R0*Math.sqrt(on*rho/mu);
+      const i32=[-1/Math.SQRT2,1/Math.SQRT2];
+      const Lam=cscale(i32,an);
+      const J0L=besselJ0(Lam),J1L=besselJ1(Lam);
+      const J0Lr=besselJ0(cscale(Lam,rf));
+      const bracket=csub([1,0],cdiv(J0Lr,J0L));
+      const F10=cdiv(cscale(J1L,2),cmul(Lam,J0L));
+      const avgB=csub([1,0],F10);
+      const pr=cdiv(bracket,avgB);
+      const th=2*Math.PI*n*peakPhase;
+      const ut=creal(cmul([uH[n].a,-uH[n].b],[Math.cos(th),Math.sin(th)]));
+      ur+=creal(pr)*ut;
+    }
+    radial.push({rFrac:rf,velocity:ur*100});
+  }
+
+  const meanV=velocity.reduce((a,b)=>a+b,0)/velocity.length;
+  const peakV=Math.max(...velocity);
+  const Re=rho*(peakV/100)*(2*R0)/mu;
+
+  return{times,pressure,velocity,flow,wss,radial,meanV,peakV,Re,alpha,c_mk,T,N,A0,R0,mu:mu,rho};
+}
+
+// ================================================
+// CANVAS HELPERS
+// ================================================
+function setupCanvas(c){const r=c.getBoundingClientRect();const d=window.devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;const ctx=c.getContext('2d');ctx.scale(d,d);return{ctx,w:r.width,h:r.height}}
+
+function drawMultiTimeSeries(canvas, seriesList, unit, yMinForce, yMaxForce, opts={}) {
+  // seriesList: [{times,data,color,label}]
+  if(!seriesList.length) return;
+  const{ctx,w,h}=setupCanvas(canvas);
+  const pad={top:10,right:45,bottom:28,left:50};
+  const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
+  ctx.clearRect(0,0,w,h);
+
+  // Y bounds
+  let yMin=Infinity,yMax=-Infinity;
+  for(const s of seriesList){for(const v of s.data){if(v<yMin)yMin=v;if(v>yMax)yMax=v}}
+  if(yMinForce!=null)yMin=yMinForce;
+  if(yMaxForce!=null)yMax=yMaxForce;
+  const yPad=(yMax-yMin)*0.08||1;
+  yMin=Math.floor((yMin-yPad)/(opts.ySnap||1))*(opts.ySnap||1);
+  yMax=Math.ceil((yMax+yPad)/(opts.ySnap||1))*(opts.ySnap||1);
+  if(yMin===yMax)yMax=yMin+1;
+
+  // Grid
+  ctx.strokeStyle='#2a2e3e';ctx.lineWidth=0.5;
+  for(let i=0;i<=5;i++){
+    const y=pad.top+(i/5)*ch;
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cw,y);ctx.stroke();
+    ctx.fillStyle='#6b7080';ctx.font='10px Inter,sans-serif';ctx.textAlign='right';
+    ctx.fillText((yMax-(i/5)*(yMax-yMin)).toFixed(opts.yDec||0),pad.left-6,y+3);
+  }
+  const tMax=seriesList[0].times[seriesList[0].times.length-1];
+  for(let i=0;i<=6;i++){
+    const x=pad.left+(i/6)*cw;
+    ctx.fillStyle='#6b7080';ctx.textAlign='center';ctx.fillText(((i/6)*tMax).toFixed(0),x,h-4);
+    ctx.strokeStyle='#2a2e3e';ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,pad.top+ch);ctx.stroke();
+  }
+
+  // Cycle seps (use first series HR)
+  const T_ms=seriesList[0].times[seriesList[0].times.length-1]/3;
+  ctx.strokeStyle='#3a3f55';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  for(let c=1;c<3;c++){const x=pad.left+(c*T_ms/tMax)*cw;ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,pad.top+ch);ctx.stroke()}
+  ctx.setLineDash([]);
+
+  // Sys/dia shading first series
+  const sysEnd=.35*T_ms;
+  ctx.fillStyle='rgba(239,83,80,0.04)';ctx.fillRect(pad.left,pad.top,(sysEnd/tMax)*cw,ch);
+  ctx.fillStyle='rgba(66,165,245,0.025)';ctx.fillRect(pad.left+(sysEnd/tMax)*cw,pad.top,((T_ms-sysEnd)/tMax)*cw,ch);
+
+  // Draw each series
+  for(let si=0;si<seriesList.length;si++){
+    const s=seriesList[si];
+    const alpha=seriesList.length===1?0.9:0.75;
+    ctx.strokeStyle=s.color;ctx.globalAlpha=alpha;
+    ctx.lineWidth=seriesList.length===1?2.5:2;ctx.lineJoin='round';
+    ctx.beginPath();
+    for(let i=0;i<s.data.length;i++){
+      const x=pad.left+(s.times[i]/tMax)*cw;
+      const y=pad.top+(1-(s.data[i]-yMin)/(yMax-yMin))*ch;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // Fill only if single series
+    if(seriesList.length===1){
+      const gr=ctx.createLinearGradient(0,pad.top,0,pad.top+ch);
+      gr.addColorStop(0,s.color.replace(')',',0.1)').replace('rgb','rgba').replace('#',''));
+      // Handle hex colors
+      const fc=hexToRGBA(s.color,0.1);const fc2=hexToRGBA(s.color,0);
+      gr.addColorStop(0,fc);gr.addColorStop(1,fc2);
+      ctx.fillStyle=gr;ctx.lineTo(pad.left+cw,pad.top+ch);ctx.lineTo(pad.left,pad.top+ch);ctx.closePath();ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // Cursor
+  if(anim.playing){
+    const cursorT=anim.time%(tMax);
+    const cx=pad.left+(cursorT/tMax)*cw;
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,pad.top);ctx.lineTo(cx,pad.top+ch);ctx.stroke();
+
+    for(const s of seriesList){
+      const idx=Math.floor((cursorT/tMax)*s.data.length);
+      if(idx>=0&&idx<s.data.length){
+        const dy=pad.top+(1-(s.data[idx]-yMin)/(yMax-yMin))*ch;
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx,dy,3,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(cx,dy,1.5,0,Math.PI*2);ctx.fill();
+      }
+    }
+  }
+
+  // Y label
+  ctx.save();ctx.fillStyle='#6b7080';ctx.font='9px Inter,sans-serif';ctx.textAlign='center';
+  ctx.translate(10,pad.top+ch/2);ctx.rotate(-Math.PI/2);ctx.fillText(unit,0,0);ctx.restore();
+
+  // Pressure annotations
+  if(opts.pressureAnnotations&&seriesList.length===1){
+    const s=seriesList[0];
+    const sysV=Math.max(...s.data),diaV=Math.min(...s.data);
+    ctx.setLineDash([3,3]);ctx.lineWidth=1;
+    const ySys=pad.top+(1-(sysV-yMin)/(yMax-yMin))*ch;
+    ctx.strokeStyle='rgba(239,83,80,0.35)';ctx.beginPath();ctx.moveTo(pad.left,ySys);ctx.lineTo(pad.left+cw,ySys);ctx.stroke();
+    ctx.fillStyle='rgba(239,83,80,0.55)';ctx.font='9px Inter,sans-serif';ctx.textAlign='left';ctx.fillText(sysV.toFixed(0)+' mmHg',pad.left+cw+3,ySys+3);
+    const yDia=pad.top+(1-(diaV-yMin)/(yMax-yMin))*ch;
+    ctx.strokeStyle='rgba(66,165,245,0.35)';ctx.beginPath();ctx.moveTo(pad.left,yDia);ctx.lineTo(pad.left+cw,yDia);ctx.stroke();
+    ctx.fillStyle='rgba(66,165,245,0.55)';ctx.fillText(diaV.toFixed(0)+' mmHg',pad.left+cw+3,yDia+3);
+    ctx.setLineDash([]);
+  }
+}
+
+function hexToRGBA(hex,a){
+  if(hex.startsWith('rgb'))return hex.replace('rgb','rgba').replace(')',`,${a})`);
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Radial profile (multi)
+function drawMultiRadial(canvas, profileList) {
+  if(!profileList.length)return;
+  const{ctx,w,h}=setupCanvas(canvas);
+  const pad={top:18,right:25,bottom:38,left:55};
+  const cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
+  ctx.clearRect(0,0,w,h);
+
+  let vMin=0,vMax=-Infinity;
+  for(const p of profileList)for(const pt of p.radial){if(pt.velocity>vMax)vMax=pt.velocity;if(pt.velocity<vMin)vMin=pt.velocity}
+  vMax*=1.1;if(vMin<0)vMin*=1.1;
+
+  // Grid
+  ctx.strokeStyle='#2a2e3e';ctx.lineWidth=0.5;
+  for(let i=0;i<=5;i++){const x=pad.left+(i/5)*cw;const v=vMin+(i/5)*(vMax-vMin);ctx.beginPath();ctx.moveTo(x,pad.top);ctx.lineTo(x,pad.top+ch);ctx.stroke();ctx.fillStyle='#6b7080';ctx.font='10px Inter,sans-serif';ctx.textAlign='center';ctx.fillText(v.toFixed(0),x,h-10)}
+  for(let i=0;i<=4;i++){const y=pad.top+(i/4)*ch;const r=1-(i/4)*2;ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cw,y);ctx.stroke();ctx.fillStyle='#6b7080';ctx.textAlign='right';ctx.fillText(r.toFixed(1),pad.left-6,y+3)}
+
+  ctx.fillStyle='#8b8fa3';ctx.font='10px Inter,sans-serif';ctx.textAlign='center';
+  ctx.fillText('Velocity (cm/s)',pad.left+cw/2,h-0);
+  ctx.save();ctx.translate(10,pad.top+ch/2);ctx.rotate(-Math.PI/2);ctx.fillText('r/R',0,0);ctx.restore();
+
+  // Walls
+  ctx.fillStyle='rgba(239,83,80,0.06)';ctx.fillRect(pad.left,pad.top,cw,ch*0.015);ctx.fillRect(pad.left,pad.top+ch*0.985,cw,ch*0.015);
+  // Center
+  const cy=pad.top+ch/2;
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;ctx.setLineDash([3,5]);ctx.beginPath();ctx.moveTo(pad.left,cy);ctx.lineTo(pad.left+cw,cy);ctx.stroke();ctx.setLineDash([]);
+
+  // Draw each profile
+  for(const p of profileList){
+    const rd=p.radial;
+    ctx.strokeStyle=p.color;ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.globalAlpha=profileList.length===1?0.9:0.75;
+    ctx.beginPath();
+    // Top half (wall to center)
+    for(let j=rd.length-1;j>=0;j--){
+      const y=pad.top+(.5-rd[j].rFrac/2)*ch;
+      const x=pad.left+((rd[j].velocity-vMin)/(vMax-vMin))*cw;
+      j===rd.length-1?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    // Bottom half
+    for(let j=0;j<rd.length;j++){
+      const y=pad.top+(.5+rd[j].rFrac/2)*ch;
+      const x=pad.left+((rd[j].velocity-vMin)/(vMax-vMin))*cw;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    // Light fill
+    ctx.fillStyle=hexToRGBA(p.color,0.06);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  // Alpha labels
+  let ly=pad.top+14;
+  for(const p of profileList){
+    ctx.fillStyle=p.color;ctx.font='bold 10px Inter,sans-serif';ctx.textAlign='right';
+    ctx.fillText(`${p.label}: \u03B1=${p.alpha.toFixed(1)}`,pad.left+cw-6,ly);
+    ly+=14;
+  }
+}
+
+// ================================================
+// LEGEND BUILDER
+// ================================================
+function buildLegend(containerId, items){
+  const el=$(containerId);
+  el.innerHTML=items.map(it=>`<div class="legend-item"><span class="legend-swatch" style="background:${it.color}"></span>${it.label}</div>`).join('');
+}
+
+// ================================================
+// COMPARISON TABLE
+// ================================================
+function buildComparisonTable(results){
+  const t=$('cmp-table');
+  if(!results.length){t.innerHTML='';return}
+  const rows=[
+    {key:'hr',     label:'Heart Rate',    unit:'bpm', fmt:v=>v.toFixed(0)},
+    {key:'sys',    label:'Systolic BP',   unit:'mmHg',fmt:v=>v.toFixed(0)},
+    {key:'dia',    label:'Diastolic BP',  unit:'mmHg',fmt:v=>v.toFixed(0)},
+    {key:'map',    label:'MAP',           unit:'mmHg',fmt:v=>v.toFixed(0)},
+    {key:'pp',     label:'Pulse Pressure',unit:'mmHg',fmt:v=>v.toFixed(0)},
+    {key:'sv',     label:'Stroke Volume', unit:'mL',  fmt:v=>v.toFixed(0)},
+    {key:'E',      label:"Young's Mod (E)",unit:'MPa', fmt:v=>v.toFixed(2)},
+    {key:'alpha',  label:'Womersley \u03B1',unit:'',   fmt:v=>v.toFixed(1)},
+    {key:'pwv',    label:'Pulse Wave Vel',unit:'m/s', fmt:v=>v.toFixed(1)},
+    {key:'peakV',  label:'Peak Velocity', unit:'cm/s',fmt:v=>v.toFixed(0)},
+    {key:'meanV',  label:'Mean Velocity', unit:'cm/s',fmt:v=>v.toFixed(1)},
+    {key:'Re',     label:'Reynolds #',    unit:'',    fmt:v=>v.toFixed(0)},
+    {key:'resist', label:'TPR Multiplier',unit:'x',   fmt:v=>v.toFixed(2)},
+  ];
+
+  let html='<thead><tr><th></th>';
+  for(const r of results)html+=`<th><div style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:3px;background:${r.color};display:inline-block"></span>${r.label}</div></th>`;
+  html+='</tr></thead><tbody>';
+
+  for(const row of rows){
+    html+='<tr><td style="color:var(--text-dim)">'+row.label+'</td>';
+    // Find best/worst for highlighting
+    const vals=results.map(r=>r.metrics[row.key]);
+    for(let i=0;i<results.length;i++){
+      const v=results[i].metrics[row.key];
+      html+=`<td><span class="val">${row.fmt(v)}</span><span class="unit">${row.unit}</span></td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody>';
+  t.innerHTML=html;
+}
+
+// ================================================
+// CUSTOM SLIDER SYNC
+// ================================================
+function syncCustomSliders(){
+  const c=PROFILES.custom;
+  $('v-hr').textContent=c.hr+' bpm'; $('v-sys').textContent=c.sys+' mmHg'; $('v-dia').textContent=c.dia+' mmHg';
+  $('v-sv').textContent=c.sv+' mL'; $('v-radius').textContent=c.radius.toFixed(1)+' mm';
+  $('v-thick').textContent=c.thick.toFixed(1)+' mm'; $('v-E').textContent=c.E.toFixed(2)+' MPa';
+  $('v-len').textContent=c.len+' cm'; $('v-rho').textContent=c.rho+' kg/m\u00B3';
+  $('v-mu').textContent=c.mu.toFixed(1)+' mPa\u00B7s'; $('v-resist').textContent=c.resistance.toFixed(2)+'x';
+}
+
+$('s-hr').oninput=e=>{PROFILES.custom.hr=+e.target.value;syncCustomSliders()};
+$('s-sys').oninput=e=>{PROFILES.custom.sys=+e.target.value;syncCustomSliders()};
+$('s-dia').oninput=e=>{PROFILES.custom.dia=+e.target.value;syncCustomSliders()};
+$('s-sv').oninput=e=>{PROFILES.custom.sv=+e.target.value;syncCustomSliders()};
+$('s-radius').oninput=e=>{PROFILES.custom.radius=+e.target.value;syncCustomSliders()};
+$('s-thick').oninput=e=>{PROFILES.custom.thick=+e.target.value;syncCustomSliders()};
+$('s-E').oninput=e=>{PROFILES.custom.E=+e.target.value;syncCustomSliders()};
+$('s-len').oninput=e=>{PROFILES.custom.len=+e.target.value;syncCustomSliders()};
+$('s-rho').oninput=e=>{PROFILES.custom.rho=+e.target.value;syncCustomSliders()};
+$('s-mu').oninput=e=>{PROFILES.custom.mu=+e.target.value;syncCustomSliders()};
+$('s-resist').oninput=e=>{PROFILES.custom.resistance=+e.target.value;syncCustomSliders()};
+
+$('btn-play').onclick=()=>{anim.playing=!anim.playing;$('btn-play').innerHTML=anim.playing?'&#9646;&#9646;':'&#9654;'};
+document.querySelectorAll('.speed-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');anim.speed=+b.dataset.speed});
+window.addEventListener('resize',()=>{});
+
+// ================================================
+// MAIN UPDATE
+// ================================================
+function update(){
+  // Clamp custom
+  if(PROFILES.custom.dia>=PROFILES.custom.sys-5)PROFILES.custom.dia=PROFILES.custom.sys-5;
+
+  // Generate waveforms for all active profiles
+  const results=[];
+  for(const key of activeProfiles){
+    const p=PROFILES[key];
+    const wf=generateWomersley(p);
+    results.push({
+      key, label:p.label, color:COLORS[key],
+      wf,
+      metrics:{
+        hr:p.hr, sys:p.sys, dia:p.dia, sv:p.sv, E:p.E,
+        map:p.dia+(p.sys-p.dia)/3, pp:p.sys-p.dia,
+        alpha:wf.alpha, pwv:wf.c_mk, peakV:wf.peakV,
+        meanV:wf.meanV, Re:wf.Re, resist:p.resistance,
+      },
+      radial:wf.radial, alpha:wf.alpha,
+    });
+  }
+
+  // Comparison table
+  buildComparisonTable(results);
+
+  // Legends
+  const legendItems=results.map(r=>({color:r.color,label:r.label}));
+  buildLegend('legend-pressure',legendItems);
+  buildLegend('legend-velocity',legendItems);
+  buildLegend('legend-radial',legendItems);
+  buildLegend('legend-flow',legendItems);
+  buildLegend('legend-wss',legendItems);
+
+  // Charts
+  const pressureSeries=results.map(r=>({times:r.wf.times,data:r.wf.pressure,color:r.color,label:r.label}));
+  const velocitySeries=results.map(r=>({times:r.wf.times,data:r.wf.velocity,color:r.color,label:r.label}));
+  const flowSeries=results.map(r=>({times:r.wf.times,data:r.wf.flow,color:r.color,label:r.label}));
+  const wssSeries=results.map(r=>({times:r.wf.times,data:r.wf.wss,color:r.color,label:r.label}));
+
+  drawMultiTimeSeries($('c-pressure'),pressureSeries,'mmHg',null,null,{ySnap:10,pressureAnnotations:true});
+  drawMultiTimeSeries($('c-velocity'),velocitySeries,'cm/s',0,null,{ySnap:20});
+  drawMultiTimeSeries($('c-flow'),flowSeries,'mL/s',0,null,{ySnap:50});
+  drawMultiTimeSeries($('c-wss'),wssSeries,'dyn/cm\u00B2',0,null,{ySnap:5,yDec:1});
+
+  drawMultiRadial($('c-radial'),results.map(r=>({radial:r.radial,color:r.color,label:r.label,alpha:r.alpha})));
+
+  // Cursor time
+  if(results.length){
+    const tMax=results[0].wf.times[results[0].wf.times.length-1];
+    $('time-display').textContent='t = '+(anim.time%tMax).toFixed(0)+' ms';
+  }
+
+  updateExplanation(results);
+}
+
+function updateExplanation(results){
+  const el=$('explanation');
+  if(!results.length){el.innerHTML='<h2>Select a profile</h2>';return}
+
+  let compText='';
+  if(results.length>1){
+    compText='<p><strong>Comparing '+results.length+' profiles:</strong> ';
+    compText+=results.map(r=>`<span style="color:${r.color};font-weight:600">${r.label}</span>`).join(', ');
+    compText+='. Look at the overlaid waveforms to see how different physiologies produce different flow patterns from the same underlying PDEs.</p>';
+
+    // Specific comparisons
+    const sorted=[...results].sort((a,b)=>a.metrics.alpha-b.metrics.alpha);
+    compText+=`<p>Womersley number ranges from <strong>${sorted[0].metrics.alpha.toFixed(1)}</strong> (${sorted[0].label}) to <strong>${sorted[sorted.length-1].metrics.alpha.toFixed(1)}</strong> (${sorted[sorted.length-1].label}). `;
+    compText+='Higher &alpha; means more inertia-dominated, plug-like flow; lower &alpha; means more viscosity-dominated, parabolic flow. Compare the radial profiles above to see this directly.</p>';
+
+    const sortedPWV=[...results].sort((a,b)=>a.metrics.pwv-b.metrics.pwv);
+    compText+=`<p>Pulse wave velocity ranges from <strong>${sortedPWV[0].metrics.pwv.toFixed(1)} m/s</strong> (${sortedPWV[0].label}, most compliant) to <strong>${sortedPWV[sortedPWV.length-1].metrics.pwv.toFixed(1)} m/s</strong> (${sortedPWV[sortedPWV.length-1].label}, stiffest). Stiffer vessels transmit pressure waves faster but buffer poorly, widening pulse pressure.</p>`;
+  } else {
+    const r=results[0];
+    if(r.alpha>10)compText=`<p><strong>&alpha; = ${r.alpha.toFixed(1)}</strong> — inertia-dominated flow. The velocity profile is nearly flat with a thin boundary layer &delta; &approx; ${(r.metrics.E<0.5?r.wf.R0*1000:r.wf.R0*1000/r.alpha).toFixed(2)} mm.</p>`;
+    else if(r.alpha>3)compText=`<p><strong>&alpha; = ${r.alpha.toFixed(1)}</strong> — transitional flow between parabolic and plug-like.</p>`;
+    else compText=`<p><strong>&alpha; = ${r.alpha.toFixed(1)}</strong> — viscosity-dominated, quasi-parabolic flow.</p>`;
+    compText+=`<p>Pulse wave velocity: <strong>${r.metrics.pwv.toFixed(1)} m/s</strong> (Moens-Korteweg). Peak velocity: <strong>${r.metrics.peakV.toFixed(0)} cm/s</strong>, Re = <strong>${r.metrics.Re.toFixed(0)}</strong>.</p>`;
+  }
+
+  el.innerHTML=`
+    <h2>Analysis</h2>
+    ${compText}
+    <div class="eq-block">
+u(r,t) = &sum;<sub>n</sub> (\u011C<sub>n</sub>)/(i&omega;<sub>n</sub>&rho;) [1 - J\u2080(&Lambda;<sub>n</sub>r/R) / J\u2080(&Lambda;<sub>n</sub>)] e<sup>i&omega;<sub>n</sub>t</sup>
+&Lambda;<sub>n</sub> = i<sup>3/2</sup>&alpha;<sub>n</sub>  ,  &alpha;<sub>n</sub> = R&radic;(&omega;<sub>n</sub>&rho;/&mu;)  [Womersley]
+c = &radic;(Eh/2&rho;R)  [Moens-Korteweg]
+&tau;<sub>w</sub> = -&mu; &part;u/&part;r |<sub>r=R</sub>  [WSS]
+    </div>
+    <p>Each profile is independently solved: pressure &rarr; Fourier decomposition (12 harmonics) &rarr; Windkessel coupling for flow &rarr; Womersley Bessel-function solution for u(r,t) &rarr; wall shear stress from radial derivative.</p>
+  `;
+}
+
+// ================================================
+// ANIMATION LOOP
+// ================================================
+buildProfileButtons();
+syncCustomSliders();
+
+let lastFrame=performance.now();
+function animate(now){
+  const dt=now-lastFrame;lastFrame=now;
+  if(anim.playing)anim.time+=dt*anim.speed;
+  update();
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
